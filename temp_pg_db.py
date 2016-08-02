@@ -8,6 +8,8 @@ import subprocess
 import tempfile
 import time
 
+__version__ = '0.5'
+
 # Module level TempDB singleton
 temp_db = None
 
