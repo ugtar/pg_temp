@@ -57,25 +57,30 @@ class TempDB(object):
             os.mkdir(self.pg_socket_dir)
             printf("Creating temp PG server...")
             sys.stdout.flush()
-            rc = subprocess.call(['initdb', self.pg_data_dir], stdout=stdout, stderr=stderr) == 0
+            rc = subprocess.call(['initdb', self.pg_data_dir],
+                                 stdout=stdout, stderr=stderr) == 0
             if not rc:
                 raise PGSetupError("Couldn't initialize temp PG data dir")
             self.pg_process = subprocess.Popen(
-                ['postgres', '-F', '-T', '-D', self.pg_data_dir, '-k', self.pg_socket_dir],
+                ['postgres', '-F', '-T',
+                 '-D', self.pg_data_dir, '-k', self.pg_socket_dir],
                 stdout=stdout, stderr=stderr)
             # test connection
             for i in range(5):
                 time.sleep(1)
-                rc = subprocess.call(['psql', '-d', 'postgres', '-h', self.pg_socket_dir, '-c', "\dt"],
-                    stdout=stdout, stderr=stderr) == 0
+                rc = subprocess.call(['psql', '-d', 'postgres',
+                                      '-h', self.pg_socket_dir, '-c', "\dt"],
+                                     stdout=stdout, stderr=stderr) == 0
                 if rc:
                     break
             else:
                 raise PGSetupError("Couldn't start PG server")
             rc = True
             for db in databases:
-                rc = rc and subprocess.call(['psql', '-d', 'postgres', '-h', self.pg_socket_dir, '-c',
-                                             "create database %s;" % db], stdout=stdout, stderr=stderr) == 0
+                rc = rc and subprocess.call(['psql', '-d', 'postgres',
+                                             '-h', self.pg_socket_dir,
+                                             '-c', "create database %s;" % db],
+                                            stdout=stdout, stderr=stderr) == 0
             if not rc:
                 raise PGSetupError("Couldn't create databases")
             print("done")
