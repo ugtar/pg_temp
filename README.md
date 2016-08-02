@@ -1,6 +1,8 @@
 temp_pg_db
 ==========
 
+[![temp_pg_db build status](https://api.travis-ci.org/ugtar/temp_pg_db.svg?branch=master)](https://travis-ci.org/ugtar/temp_pg_db)
+
 Provides a simple class for creating a temporary userland Postgres db server.
 
 The `TempDB()` class constructor will set up the database server in a temporary
