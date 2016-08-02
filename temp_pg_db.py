@@ -38,7 +38,15 @@ def printf(msg):
 
 class TempDB(object):
 
-    def __init__(self, databases=None, verbosity=0):
+    def __init__(self, databases=None, verbosity=0, retry=5, tincr=1.0):
+        """Initialize a temporary Postgres database
+
+        :param databases: list of databases to create
+        :param verbosity: verbosity level, non-zero values print messages
+        :param retry: number of times to retry a connection
+        :param tincr: how much time to wait between retries
+
+        """
         databases = databases or []
         stdout = None
         stderr = None
@@ -66,8 +74,8 @@ class TempDB(object):
                  '-D', self.pg_data_dir, '-k', self.pg_socket_dir],
                 stdout=stdout, stderr=stderr)
             # test connection
-            for i in range(5):
-                time.sleep(1)
+            for i in range(retry):
+                time.sleep(tincr)
                 rc = subprocess.call(['psql', '-d', 'postgres',
                                       '-h', self.pg_socket_dir, '-c', "\dt"],
                                      stdout=stdout, stderr=stderr) == 0
