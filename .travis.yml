@@ -1,0 +1,16 @@
+language: python
+python: 2.7
+env:
+  - TOX_ENV=py26
+  - TOX_ENV=py27
+  - TOX_ENV=py33
+  - TOX_ENV=py34
+install:
+  - sudo apt-get install -y python-dev
+  - sudo apt-get remove -y postgresql-9.1
+  - sudo apt-get install -y postgresql
+  - sudo apt-get install -y libpq-dev
+  - pip install tox
+script:
+  - env PATH=/usr/lib/postgresql/9.5/bin:"$PATH" tox -e $TOX_ENV
+  - make check
