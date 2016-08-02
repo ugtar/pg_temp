@@ -68,3 +68,31 @@ Creating temp PG server... done
 >>> connection.close()
 >>> temp_db.cleanup()
 ```
+
+
+Development
+-----------
+
+Install dependencies for testing:
+
+    # Create a virtualenv
+    virtualenv env27
+
+    # Activate the virtualenv
+    . env27/bin/activate
+
+    # Install dependencies for testing
+    pip install -r requirements-dev.txt
+
+Run the unit tests directly:
+
+    make test
+
+To test against multiple Python versions, without needing to use
+Virtualenv directly, run the unit tests using tox:
+
+    make tox
+
+Check code style using flake8:
+
+    make check
