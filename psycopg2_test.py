@@ -8,7 +8,7 @@ import psycopg2
 class Psycopg2TestCase(unittest2.TestCase):
 
     def setUp(self):
-        self.db = TempDB(databases=['test_db'])
+        self.db = TempDB(databases=['test_db'], verbosity=1)
 
     def tearDown(self):
         self.db.cleanup()
@@ -17,6 +17,7 @@ class Psycopg2TestCase(unittest2.TestCase):
         connection = psycopg2.connect(host=self.db.pg_socket_dir,
                                       database='test_db')
         self.assertTrue(connection)
+        connection.close()
 
 
 if __name__ == '__main__':
