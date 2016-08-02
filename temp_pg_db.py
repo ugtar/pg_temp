@@ -71,8 +71,11 @@ class TempDB(object):
                 raise PGSetupError("Couldn't initialize temp PG data dir")
             self.pg_process = subprocess.Popen(
                 ['postgres', '-F', '-T',
-                 '-D', self.pg_data_dir, '-k', self.pg_socket_dir],
+                 '-D', self.pg_data_dir,
+                 '-k', self.pg_socket_dir,
+                 '-h', ''],
                 stdout=stdout, stderr=stderr)
+
             # test connection
             for i in range(retry):
                 time.sleep(tincr)
