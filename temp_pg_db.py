@@ -38,13 +38,23 @@ def printf(msg):
 
 class TempDB(object):
 
-    def __init__(self, databases=None, verbosity=0, retry=5, tincr=1.0):
+    def __init__(self,
+                 databases=None,
+                 verbosity=0,
+                 retry=5,
+                 tincr=1.0,
+                 initdb='initdb',
+                 postgres='postgres',
+                 psql='psql'):
         """Initialize a temporary Postgres database
 
         :param databases: list of databases to create
         :param verbosity: verbosity level, non-zero values print messages
         :param retry: number of times to retry a connection
         :param tincr: how much time to wait between retries
+        :param initdb: path to `initdb`, defaults to first in $PATH
+        :param postgres: path to `postgres`, defaults to first in $PATH
+        :param psql: path to `psql`, defaults to first in $PATH
 
         """
         databases = databases or []
@@ -65,12 +75,12 @@ class TempDB(object):
             os.mkdir(self.pg_socket_dir)
             printf("Creating temp PG server...")
             sys.stdout.flush()
-            rc = subprocess.call(['initdb', self.pg_data_dir],
+            rc = subprocess.call([initdb, self.pg_data_dir],
                                  stdout=stdout, stderr=stderr) == 0
             if not rc:
                 raise PGSetupError("Couldn't initialize temp PG data dir")
             self.pg_process = subprocess.Popen(
-                ['postgres', '-F', '-T',
+                [postgres, '-F', '-T',
                  '-D', self.pg_data_dir,
                  '-k', self.pg_socket_dir,
                  '-h', ''],
@@ -79,8 +89,9 @@ class TempDB(object):
             # test connection
             for i in range(retry):
                 time.sleep(tincr)
-                rc = subprocess.call(['psql', '-d', 'postgres',
-                                      '-h', self.pg_socket_dir, '-c', "\dt"],
+                rc = subprocess.call([psql, '-d', 'postgres',
+                                      '-h', self.pg_socket_dir,
+                                      '-c', "\dt"],
                                      stdout=stdout, stderr=stderr) == 0
                 if rc:
                     break
@@ -88,7 +99,7 @@ class TempDB(object):
                 raise PGSetupError("Couldn't start PG server")
             rc = True
             for db in databases:
-                rc = rc and subprocess.call(['psql', '-d', 'postgres',
+                rc = rc and subprocess.call([psql, '-d', 'postgres',
                                              '-h', self.pg_socket_dir,
                                              '-c', "create database %s;" % db],
                                             stdout=stdout, stderr=stderr) == 0
