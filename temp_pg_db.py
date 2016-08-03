@@ -1,5 +1,5 @@
 """Set up a temporary postgres DB"""
-
+from __future__ import absolute_import, division, unicode_literals
 import os
 import sys
 import atexit
@@ -7,6 +7,8 @@ import shutil
 import subprocess
 import tempfile
 import time
+
+__version__ = '0.5'
 
 # Module level TempDB singleton
 temp_db = None
@@ -30,9 +32,31 @@ class PGSetupError(Exception):
     pass
 
 
+def printf(msg):
+    sys.stdout.write(msg)
+
+
 class TempDB(object):
 
-    def __init__(self, databases=None, verbosity=0):
+    def __init__(self,
+                 databases=None,
+                 verbosity=0,
+                 retry=5,
+                 tincr=1.0,
+                 initdb='initdb',
+                 postgres='postgres',
+                 psql='psql'):
+        """Initialize a temporary Postgres database
+
+        :param databases: list of databases to create
+        :param verbosity: verbosity level, non-zero values print messages
+        :param retry: number of times to retry a connection
+        :param tincr: how much time to wait between retries
+        :param initdb: path to `initdb`, defaults to first in $PATH
+        :param postgres: path to `postgres`, defaults to first in $PATH
+        :param psql: path to `psql`, defaults to first in $PATH
+
+        """
         databases = databases or []
         stdout = None
         stderr = None
@@ -49,31 +73,40 @@ class TempDB(object):
             os.mkdir(self.pg_data_dir)
             self.pg_socket_dir = os.path.join(self.pg_temp_dir, 'socket')
             os.mkdir(self.pg_socket_dir)
-            print "Creating temp PG server...",
+            printf("Creating temp PG server...")
             sys.stdout.flush()
-            rc = subprocess.call(['initdb', self.pg_data_dir], stdout=stdout, stderr=stderr) == 0
+            rc = subprocess.call([initdb, self.pg_data_dir],
+                                 stdout=stdout, stderr=stderr) == 0
             if not rc:
                 raise PGSetupError("Couldn't initialize temp PG data dir")
             self.pg_process = subprocess.Popen(
-                ['postgres', '-F', '-T', '-D', self.pg_data_dir, '-k', self.pg_socket_dir],
+                [postgres, '-F', '-T',
+                 '-D', self.pg_data_dir,
+                 '-k', self.pg_socket_dir,
+                 '-h', ''],
                 stdout=stdout, stderr=stderr)
+
             # test connection
-            for i in xrange(5):
-                time.sleep(1)
-                rc = subprocess.call(['psql', '-d', 'postgres', '-h', self.pg_socket_dir, '-c', "\dt"],
-                    stdout=stdout, stderr=stderr) == 0
+            for i in range(retry):
+                time.sleep(tincr)
+                rc = subprocess.call([psql, '-d', 'postgres',
+                                      '-h', self.pg_socket_dir,
+                                      '-c', "\dt"],
+                                     stdout=stdout, stderr=stderr) == 0
                 if rc:
                     break
             else:
                 raise PGSetupError("Couldn't start PG server")
             rc = True
             for db in databases:
-                rc = rc and subprocess.call(['psql', '-d', 'postgres', '-h', self.pg_socket_dir, '-c',
-                                             "create database %s;" % db], stdout=stdout, stderr=stderr) == 0
+                rc = rc and subprocess.call([psql, '-d', 'postgres',
+                                             '-h', self.pg_socket_dir,
+                                             '-c', "create database %s;" % db],
+                                            stdout=stdout, stderr=stderr) == 0
             if not rc:
                 raise PGSetupError("Couldn't create databases")
-            print "done"
-            print "(Connect on: `psql -h %s`)" % self.pg_socket_dir
+            print("done")
+            print("(Connect on: `psql -h %s`)" % self.pg_socket_dir)
         except Exception:
             self.cleanup()
             raise
