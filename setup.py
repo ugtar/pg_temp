@@ -20,7 +20,7 @@ SETUP_ARGS = dict(
     author_email='ugtar -at- gmail.com',
     url='https://github.com/ugtar/temp_pg_db',
     license='MIT',
-    platforms=['POSIX', 'Windows'],
+    platforms=['POSIX'],
     keywords=['postgres', 'testing'],
     classifiers=[
         'License :: OSI Approved :: BSD License',
