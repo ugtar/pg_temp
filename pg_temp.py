@@ -7,6 +7,13 @@ import shutil
 import subprocess
 import tempfile
 import time
+import pwd
+from contextlib import contextmanager
+
+if sys.version_info < (3, 3):
+    from pipes import quote
+else:
+    from shlex import quote
 
 __version__ = '0.5'
 
@@ -28,6 +35,35 @@ def cleanup():
     temp_db.cleanup()
 
 
+@contextmanager
+def check_user():
+    # If running as root, try to run the db server creation as postgres
+    # user (assumed to exist)
+    run_as = lambda x: x
+    current_euid = os.geteuid()
+    current_egid = os.getegid()
+    current_user = pwd.getpwuid(current_euid).pw_name
+    if current_euid == 0:
+        try:
+            # try to find the postgres user
+            name = pwd.getpwnam('postgres')
+        except KeyError:
+            raise PGSetupError("Can't create DB server as root, and "
+                               "there's no postgres user!")
+        run_as = lambda cmd: ['su', '-', 'postgres', '-c',
+                              ' '.join(quote(c) for c in cmd)]
+        # Note: we can't just seteuid because the postgres server process
+        # checks that euid == uid and that euid is not 0
+        # http://doxygen.postgresql.org/main_8c.html#a0bd2ee2e17615192912a97c16f908ac2
+        os.setegid(name.pw_gid)
+        os.seteuid(name.pw_uid)
+    try:
+        yield run_as, current_user
+    finally:
+        os.seteuid(current_euid)
+        os.setegid(current_egid)
+
+
 class PGSetupError(Exception):
     pass
 
@@ -45,7 +81,8 @@ class TempDB(object):
                  tincr=1.0,
                  initdb='initdb',
                  postgres='postgres',
-                 psql='psql'):
+                 psql='psql',
+                 createuser='createuser'):
         """Initialize a temporary Postgres database
 
         :param databases: list of databases to create
@@ -57,6 +94,13 @@ class TempDB(object):
         :param psql: path to `psql`, defaults to first in $PATH
 
         """
+        with check_user() as (run_as, user_name):
+            self._setup(databases, verbosity, retry, tincr, initdb, postgres,
+                        psql, createuser, run_as, user_name)
+
+    def _setup(self, databases, verbosity, retry, tincr, initdb, postgres,
+               psql, createuser, run_as, user_name):
+
         databases = databases or []
         stdout = None
         stderr = None
@@ -75,34 +119,42 @@ class TempDB(object):
             os.mkdir(self.pg_socket_dir)
             printf("Creating temp PG server...")
             sys.stdout.flush()
-            rc = subprocess.call([initdb, self.pg_data_dir],
+            rc = subprocess.call(run_as([initdb, self.pg_data_dir]),
                                  stdout=stdout, stderr=stderr) == 0
             if not rc:
                 raise PGSetupError("Couldn't initialize temp PG data dir")
             self.pg_process = subprocess.Popen(
-                [postgres, '-F', '-T',
-                 '-D', self.pg_data_dir,
-                 '-k', self.pg_socket_dir,
-                 '-h', ''],
+                run_as([postgres, '-F', '-T',
+                        '-D', self.pg_data_dir,
+                        '-k', self.pg_socket_dir,
+                        '-h', '']),
                 stdout=stdout, stderr=stderr)
 
             # test connection
             for i in range(retry):
                 time.sleep(tincr)
-                rc = subprocess.call([psql, '-d', 'postgres',
-                                      '-h', self.pg_socket_dir,
-                                      '-c', "\dt"],
+                rc = subprocess.call(run_as([psql, '-d', 'postgres',
+                                             '-h', self.pg_socket_dir,
+                                             '-c', "\dt"]),
                                      stdout=stdout, stderr=stderr) == 0
                 if rc:
                     break
             else:
                 raise PGSetupError("Couldn't start PG server")
+            rc = subprocess.call(run_as([createuser,
+                                         '-h', self.pg_socket_dir,
+                                         user_name, '-s']),
+                                 stdout=stdout, stderr=stderr) == 0
+            if not rc:
+                # maybe the user already exists, and that's ok
+                pass
             rc = True
             for db in databases:
-                rc = rc and subprocess.call([psql, '-d', 'postgres',
-                                             '-h', self.pg_socket_dir,
-                                             '-c', "create database %s;" % db],
-                                            stdout=stdout, stderr=stderr) == 0
+                rc = rc and subprocess.call(
+                    run_as([psql, '-d', 'postgres',
+                            '-h', self.pg_socket_dir,
+                            '-c', "create database %s;" % db]),
+                    stdout=stdout, stderr=stderr) == 0
             if not rc:
                 raise PGSetupError("Couldn't create databases")
             print("done")
