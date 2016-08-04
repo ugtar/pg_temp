@@ -1,11 +1,16 @@
-import unittest2
+import sys
+import psycopg2
 
 from temp_pg_db import TempDB
 
-import psycopg2
+# Import unittest2 for older python versions
+if sys.version_info < (2, 7):
+    import unittest2 as unittest
+else:
+    import unittest
 
 
-class Psycopg2TestCase(unittest2.TestCase):
+class Psycopg2TestCase(unittest.TestCase):
 
     def setUp(self):
         self.db = TempDB(databases=['test_db'], verbosity=1)
@@ -21,4 +26,4 @@ class Psycopg2TestCase(unittest2.TestCase):
 
 
 if __name__ == '__main__':
-    unittest2.main()
+    unittest.main()
