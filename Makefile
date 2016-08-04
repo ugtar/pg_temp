@@ -59,6 +59,7 @@ check:
 
 clean:
 	$(RM) *.py[cod]
+	$(RM_R) __pycache__
 	$(RM_R) $(ARTIFACTS)
 .PHONY: clean
 
