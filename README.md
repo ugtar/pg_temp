@@ -1,7 +1,7 @@
-temp_pg_db
+pg_temp
 ==========
 
-[![temp_pg_db build status](https://api.travis-ci.org/ugtar/temp_pg_db.svg?branch=master)](https://travis-ci.org/ugtar/temp_pg_db)
+[![pg_temp build status](https://api.travis-ci.org/ugtar/pg_temp.svg?branch=master)](https://travis-ci.org/ugtar/pg_temp)
 
 Provides a simple class for creating a temporary userland Postgres db server.
 
@@ -26,7 +26,7 @@ Examples:
 Create a temporary server with a database called 'testdb':
 ```python
 
-from temp_pg_db import TempDB
+from pg_temp import TempDB
 temp_db = TempDB(databases=['testdb'])
 
 # you can connect to this database using temp_db's pg_socket_dir
@@ -40,8 +40,8 @@ temp_db.cleanup()
 Alternatively, useful in a test runner:
 
 ```python
-import temp_pg_db
-temp_db = temp_pg_db.init_temp_db(databases=['testdb'])
+import pg_temp
+temp_db = pg_temp.init_temp_db(databases=['testdb'])
 # repeat above in multiple modules
 
 # you can connect to this database using temp_db's pg_socket_dir
@@ -53,9 +53,9 @@ connection = psycopg2.connect(host=temp_db.pg_socket_dir, database='testdb')
 
 Last an interactive example:
 ```python
->>> import temp_pg_db
+>>> import pg_temp
 >>> import psycopg2
->>> temp_db = temp_pg_db.TempDB(databases=['testdb'])
+>>> temp_db = pg_temp.TempDB(databases=['testdb'])
 Creating temp PG server... done
 (Connect on: `psql -h /var/folders/d7/n3_h9vnn3w3bbmsnbdb73fmw0000gn/T/pg_tmp_OQMGwC/socket`)
 >>> connection = psycopg2.connect(host=temp_db.pg_socket_dir, database='testdb')

@@ -71,7 +71,7 @@ tags:
 	$(CTAGS) -f tags *.py
 
 test:
-	$(TESTCMD) --pyargs temp_pg_db psycopg2_test
+	$(TESTCMD) --pyargs pg_temp psycopg2_test
 .PHONY: test
 
 tox:

@@ -7,18 +7,18 @@ except ImportError:
     import distutils.core as setup_mod
 
 here = os.path.dirname(__file__)
-version = os.path.join(here, 'temp_pg_db.py')
+version = os.path.join(here, 'pg_temp.py')
 scope = {}
 exec(open(version).read(), scope)
 
 SETUP_ARGS = dict(
-    name='temp_pg_db',
+    name='pg_temp',
     version=scope['__version__'],
     description='Quickly create Postgres databases, e.g. for testing',
     long_description='A library for creating temporary Postgres databases.',
     author='Uri Okrent',
     author_email='ugtar -at- gmail.com',
-    url='https://github.com/ugtar/temp_pg_db',
+    url='https://github.com/ugtar/pg_temp',
     license='MIT',
     platforms=['POSIX'],
     keywords=['postgres', 'testing'],
@@ -36,7 +36,7 @@ SETUP_ARGS = dict(
         'Programming Language :: Python',
     ],
     options={'clean': {'all': 1}},
-    py_modules=['temp_pg_db'],
+    py_modules=['pg_temp'],
 )
 
 
