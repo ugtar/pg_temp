@@ -1,5 +1,6 @@
 """Set up a temporary postgres DB"""
 from __future__ import absolute_import, division, unicode_literals
+import itertools
 import os
 import sys
 import atexit
@@ -19,6 +20,10 @@ __version__ = '0.6.0'
 
 # Module level TempDB singleton
 temp_db = None
+
+
+def flatten(listOfLists):
+    return itertools.chain.from_iterable(listOfLists)
 
 
 def init_temp_db(databases=None, verbosity=0):
@@ -82,7 +87,9 @@ class TempDB(object):
                  initdb='initdb',
                  postgres='postgres',
                  psql='psql',
-                 createuser='createuser'):
+                 createuser='createuser',
+                 dirname=None,
+                 options=None):
         """Initialize a temporary Postgres database
 
         :param databases: list of databases to create
@@ -92,14 +99,19 @@ class TempDB(object):
         :param initdb: path to `initdb`, defaults to first in $PATH
         :param postgres: path to `postgres`, defaults to first in $PATH
         :param psql: path to `psql`, defaults to first in $PATH
+        :param dirname: override temp data directory generation and create the
+            db in `dirname`
+        :param options: a dictionary of configuration params and values
+            passed to `postgres` with `-c`
 
         """
         with check_user() as (run_as, user_name):
+            options = dict() if not options else options
             self._setup(databases, verbosity, retry, tincr, initdb, postgres,
-                        psql, createuser, run_as, user_name)
+                        psql, createuser, run_as, user_name, dirname, options)
 
     def _setup(self, databases, verbosity, retry, tincr, initdb, postgres,
-               psql, createuser, run_as, user_name):
+               psql, createuser, run_as, user_name, dirname, options):
 
         databases = databases or []
         stdout = None
@@ -112,7 +124,11 @@ class TempDB(object):
             self.pg_process = None
             self.pg_temp_dir = None
 
-            self.pg_temp_dir = tempfile.mkdtemp(prefix='pg_tmp_')
+            if dirname:
+                os.makedirs(dirname, exist_ok=True)
+                self.pg_temp_dir = dirname
+            else:
+                self.pg_temp_dir = tempfile.mkdtemp(prefix='pg_tmp_')
             self.pg_data_dir = os.path.join(self.pg_temp_dir, 'data')
             os.mkdir(self.pg_data_dir)
             self.pg_socket_dir = os.path.join(self.pg_temp_dir, 'socket')
@@ -123,11 +139,14 @@ class TempDB(object):
                                  stdout=stdout, stderr=stderr) == 0
             if not rc:
                 raise PGSetupError("Couldn't initialize temp PG data dir")
+            options = ['%s=%s' % (k, v) for (k, v) in options.items()]
+            cmd = [postgres, '-F', '-T', '-D', self.pg_data_dir,
+                   '-k', self.pg_socket_dir, '-h', '']
+            cmd += flatten(zip(itertools.repeat('-c'), options))
+
+            printf("Running %s" % str(' '.join(cmd)))
             self.pg_process = subprocess.Popen(
-                run_as([postgres, '-F', '-T',
-                        '-D', self.pg_data_dir,
-                        '-k', self.pg_socket_dir,
-                        '-h', '']),
+                run_as(cmd),
                 stdout=stdout, stderr=stderr)
 
             # test connection
