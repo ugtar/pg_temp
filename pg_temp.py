@@ -135,7 +135,7 @@ class TempDB(object):
                 time.sleep(tincr)
                 rc = subprocess.call(run_as([psql, '-d', 'postgres',
                                              '-h', self.pg_socket_dir,
-                                             '-c', "\dt"]),
+                                             '-c', r"\dt"]),
                                      stdout=stdout, stderr=stderr) == 0
                 if rc:
                     break
