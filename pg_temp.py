@@ -16,7 +16,7 @@ if sys.version_info < (3, 3):
 else:
     from shlex import quote
 
-__version__ = '0.6.0'
+__version__ = '0.7.1'
 
 # Module level TempDB singleton
 temp_db = None
