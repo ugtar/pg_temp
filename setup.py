@@ -11,11 +11,17 @@ version = os.path.join(here, 'pg_temp.py')
 scope = {}
 exec(open(version).read(), scope)
 
+
+with open("README.md", "r") as fh:
+    long_description = fh.read()
+
+
 SETUP_ARGS = dict(
     name='pg_temp',
     version=scope['__version__'],
     description='Quickly create Postgres databases, e.g. for testing',
-    long_description='A library for creating temporary Postgres databases.',
+    long_description=long_description,
+    long_description_content_type="text/markdown",
     author='Uri Okrent',
     author_email='uokrent@gmail.com',
     url='https://github.com/ugtar/pg_temp',
@@ -36,6 +42,7 @@ SETUP_ARGS = dict(
     ],
     options={'clean': {'all': 1}},
     py_modules=['pg_temp'],
+    python_requires='>=3.5',
 )
 
 
