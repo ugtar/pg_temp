@@ -25,10 +25,10 @@ def flatten(listOfLists):
     return itertools.chain.from_iterable(listOfLists)
 
 
-def init_temp_db(databases=None, verbosity=0):
+def init_temp_db(*args, **kwargs):
     global temp_db
     if not temp_db:
-        temp_db = TempDB(databases, verbosity)
+        temp_db = TempDB(*args, **kwargs)
         atexit.register(cleanup)
     return temp_db
 
