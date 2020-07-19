@@ -1,14 +1,8 @@
-import sys
+import unittest
 
 import psycopg2
 
 from pg_temp import TempDB, init_temp_db
-
-# Import unittest2 for older python versions
-if sys.version_info < (2, 7):
-    import unittest2 as unittest
-else:
-    import unittest
 
 
 class Psycopg2TestCase(unittest.TestCase):

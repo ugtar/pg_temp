@@ -78,10 +78,10 @@ Development
 Install dependencies for testing:
 
     # Create a virtualenv
-    virtualenv env27
+    virtualenv venv
 
     # Activate the virtualenv
-    . env27/bin/activate
+    . venv/bin/activate
 
     # Install dependencies for testing
     pip install -r requirements-dev.txt
