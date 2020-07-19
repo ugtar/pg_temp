@@ -84,6 +84,7 @@ class TempDB(object):
                  psql='psql',
                  createuser='createuser',
                  dirname=None,
+                 sock_dir=None,
                  options=None):
         """Initialize a temporary Postgres database
 
@@ -96,6 +97,7 @@ class TempDB(object):
         :param psql: path to `psql`, defaults to first in $PATH
         :param dirname: override temp data directory generation and create the
             db in `dirname`
+        :param sock_dir: specify the postgres socket directory
         :param options: a dictionary of configuration params and values
             passed to `postgres` with `-c`
 
@@ -103,7 +105,7 @@ class TempDB(object):
         self.verbosity = verbosity
         with check_user() as (run_as, user_name):
             options = dict() if not options else options
-            self._setup(databases, retry, tincr, initdb, postgres,
+            self._setup(databases, retry, tincr, initdb, postgres, sock_dir,
                         psql, createuser, run_as, user_name, dirname, options)
 
     def stdout(self, level):
@@ -125,7 +127,7 @@ class TempDB(object):
             return
         print(msg)
 
-    def _setup(self, databases, retry, tincr, initdb, postgres,
+    def _setup(self, databases, retry, tincr, initdb, postgres, sock_dir,
                psql, createuser, run_as, user_name, dirname, options):
 
         databases = databases or []
@@ -140,8 +142,11 @@ class TempDB(object):
                 self.pg_temp_dir = tempfile.mkdtemp(prefix='pg_tmp_')
             self.pg_data_dir = os.path.join(self.pg_temp_dir, 'data')
             os.mkdir(self.pg_data_dir)
-            self.pg_socket_dir = os.path.join(self.pg_temp_dir, 'socket')
-            os.mkdir(self.pg_socket_dir)
+            if not sock_dir:
+                self.pg_socket_dir = os.path.join(self.pg_temp_dir, 'socket')
+                os.mkdir(self.pg_socket_dir)
+            else:
+                self.pg_socket_dir = sock_dir
             self.printf("Creating temp PG server...")
             rc = subprocess.call(run_as([initdb, self.pg_data_dir]),
                                  stdout=self.stdout(2),
