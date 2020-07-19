@@ -4,7 +4,7 @@
 CTAGS ?= ctags
 FIND ?= find
 PYTEST ?= py.test
-PYTHON ?= python
+PYTHON ?= python3
 RM ?= rm -f
 RM_R ?= rm -fr
 SH ?= sh
@@ -13,7 +13,7 @@ TOX ?= tox
 # Options
 flags ?=
 
-TESTCMD ?= $(PYTEST) $(flags)
+TESTCMD ?= $(PYTHON) -m pytest $(flags)
 TOXCMD ?= $(TOX) --develop --skip-missing-interpreters
 
 ifdef V
@@ -71,7 +71,7 @@ tags:
 	$(CTAGS) -f tags *.py
 
 test:
-	$(TESTCMD) --pyargs pg_temp psycopg2_test.py
+	$(TESTCMD) tests/psycopg2_test.py
 .PHONY: test
 
 tox:

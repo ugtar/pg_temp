@@ -7,7 +7,7 @@ except ImportError:
     import distutils.core as setup_mod
 
 here = os.path.dirname(__file__)
-version = os.path.join(here, 'pg_temp.py')
+version = os.path.join(here, 'pg_temp', 'version.py')
 scope = {}
 exec(open(version).read(), scope)
 
@@ -41,7 +41,7 @@ SETUP_ARGS = dict(
         'Programming Language :: Python',
     ],
     options={'clean': {'all': 1}},
-    py_modules=['pg_temp'],
+    packages=['pg_temp'],
     python_requires='>=3.5',
 )
 
