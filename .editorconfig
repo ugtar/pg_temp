@@ -1,0 +1,18 @@
+# EditorConfig (http://editorconfig.org)
+
+# Top-most EditorConfig file
+root = true
+
+# Defaults wanted by git for all files
+[*]
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# Configs for all python source
+[**.py]
+indent_style = space
+indent_size = 4
+max_line_length = 80
+# Python 3
+charset = utf-8
