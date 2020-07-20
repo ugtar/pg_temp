@@ -13,8 +13,8 @@ matrix:
 install:
   - sudo apt-get install -y python-dev
   - sudo apt-get remove -y postgresql-9.2
-  - sudo apt-get install -y postgresql
+  - sudo apt-get install -y postgresql-11
   - sudo apt-get install -y libpq-dev
   - pip install tox
 script:
-  - env PATH=/usr/lib/postgresql/10/bin:"$PATH" tox
+  - env PATH=/usr/lib/postgresql/11/bin:"$PATH" tox

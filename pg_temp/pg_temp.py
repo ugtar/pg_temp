@@ -16,7 +16,6 @@ if sys.version_info < (3, 3):
 else:
     from shlex import quote
 
-__version__ = '0.7.1'
 
 # Module level TempDB singleton
 temp_db = None
@@ -26,10 +25,10 @@ def flatten(listOfLists):
     return itertools.chain.from_iterable(listOfLists)
 
 
-def init_temp_db(databases=None, verbosity=0):
+def init_temp_db(*args, **kwargs):
     global temp_db
     if not temp_db:
-        temp_db = TempDB(databases, verbosity)
+        temp_db = TempDB(*args, **kwargs)
         atexit.register(cleanup)
     return temp_db
 
@@ -73,15 +72,11 @@ class PGSetupError(Exception):
     pass
 
 
-def printf(msg):
-    sys.stdout.write(msg)
-
-
 class TempDB(object):
 
     def __init__(self,
                  databases=None,
-                 verbosity=0,
+                 verbosity=1,
                  retry=5,
                  tincr=1.0,
                  initdb='initdb',
@@ -89,11 +84,12 @@ class TempDB(object):
                  psql='psql',
                  createuser='createuser',
                  dirname=None,
+                 sock_dir=None,
                  options=None):
         """Initialize a temporary Postgres database
 
         :param databases: list of databases to create
-        :param verbosity: verbosity level, non-zero values print messages
+        :param verbosity: verbosity level, larger values are more verbose
         :param retry: number of times to retry a connection
         :param tincr: how much time to wait between retries
         :param initdb: path to `initdb`, defaults to first in $PATH
@@ -101,25 +97,40 @@ class TempDB(object):
         :param psql: path to `psql`, defaults to first in $PATH
         :param dirname: override temp data directory generation and create the
             db in `dirname`
+        :param sock_dir: specify the postgres socket directory
         :param options: a dictionary of configuration params and values
             passed to `postgres` with `-c`
 
         """
+        self.verbosity = verbosity
         with check_user() as (run_as, user_name):
             options = dict() if not options else options
-            self._setup(databases, verbosity, retry, tincr, initdb, postgres,
+            self._setup(databases, retry, tincr, initdb, postgres, sock_dir,
                         psql, createuser, run_as, user_name, dirname, options)
 
-    def _setup(self, databases, verbosity, retry, tincr, initdb, postgres,
+    def stdout(self, level):
+        """Return file handle for stdout for the current verbosity"""
+        if level > self.verbosity:
+            return open(os.devnull, 'wb')
+        else:
+            return sys.stdout
+
+    def stderr(self, level):
+        """Return file handle for stderr for the current verbosity"""
+        if level > self.verbosity:
+            return open(os.devnull, 'wb')
+        else:
+            return sys.stderr
+
+    def printf(self, msg, level=1):
+        if level > self.verbosity:
+            return
+        print(msg)
+
+    def _setup(self, databases, retry, tincr, initdb, postgres, sock_dir,
                psql, createuser, run_as, user_name, dirname, options):
 
         databases = databases or []
-        stdout = None
-        stderr = None
-        if not verbosity:
-            f = open(os.devnull, 'wb')
-            stdout = f
-            stderr = f
         try:
             self.pg_process = None
             self.pg_temp_dir = None
@@ -131,12 +142,15 @@ class TempDB(object):
                 self.pg_temp_dir = tempfile.mkdtemp(prefix='pg_tmp_')
             self.pg_data_dir = os.path.join(self.pg_temp_dir, 'data')
             os.mkdir(self.pg_data_dir)
-            self.pg_socket_dir = os.path.join(self.pg_temp_dir, 'socket')
-            os.mkdir(self.pg_socket_dir)
-            printf("Creating temp PG server...")
-            sys.stdout.flush()
+            if not sock_dir:
+                self.pg_socket_dir = os.path.join(self.pg_temp_dir, 'socket')
+                os.mkdir(self.pg_socket_dir)
+            else:
+                self.pg_socket_dir = sock_dir
+            self.printf("Creating temp PG server...")
             rc = subprocess.call(run_as([initdb, self.pg_data_dir]),
-                                 stdout=stdout, stderr=stderr) == 0
+                                 stdout=self.stdout(2),
+                                 stderr=self.stderr(2)) == 0
             if not rc:
                 raise PGSetupError("Couldn't initialize temp PG data dir")
             options = ['%s=%s' % (k, v) for (k, v) in options.items()]
@@ -144,10 +158,11 @@ class TempDB(object):
                    '-k', self.pg_socket_dir, '-h', '']
             cmd += flatten(zip(itertools.repeat('-c'), options))
 
-            printf("Running %s" % str(' '.join(cmd)))
+            self.printf("Running %s" % str(' '.join(cmd)))
             self.pg_process = subprocess.Popen(
                 run_as(cmd),
-                stdout=stdout, stderr=stderr)
+                stdout=self.stdout(2),
+                stderr=self.stderr(2))
 
             # test connection
             for i in range(retry):
@@ -155,7 +170,8 @@ class TempDB(object):
                 rc = subprocess.call(run_as([psql, '-d', 'postgres',
                                              '-h', self.pg_socket_dir,
                                              '-c', r"\dt"]),
-                                     stdout=stdout, stderr=stderr) == 0
+                                     stdout=self.stdout(2),
+                                     stderr=self.stderr(2)) == 0
                 if rc:
                     break
             else:
@@ -163,7 +179,8 @@ class TempDB(object):
             rc = subprocess.call(run_as([createuser,
                                          '-h', self.pg_socket_dir,
                                          user_name, '-s']),
-                                 stdout=stdout, stderr=stderr) == 0
+                                 stdout=self.stdout(2),
+                                 stderr=self.stderr(2)) == 0
             if not rc:
                 # maybe the user already exists, and that's ok
                 pass
@@ -173,11 +190,12 @@ class TempDB(object):
                     run_as([psql, '-d', 'postgres',
                             '-h', self.pg_socket_dir,
                             '-c', "create database %s;" % db]),
-                    stdout=stdout, stderr=stderr) == 0
+                    stdout=self.stdout(2),
+                    stderr=self.stderr(2)) == 0
             if not rc:
                 raise PGSetupError("Couldn't create databases")
-            print("done")
-            print("(Connect on: `psql -h %s`)" % self.pg_socket_dir)
+            self.printf("done")
+            self.printf("(Connect on: `psql -h %s`)" % self.pg_socket_dir)
         except Exception:
             self.cleanup()
             raise
