@@ -130,15 +130,13 @@ class TempDB(object):
             self.pg_process = None
             self.pg_temp_dir = None
 
-            if dirname:
-                os.makedirs(dirname, exist_ok=True)
-                self.pg_temp_dir = dirname
-            else:
+            if not dirname:
                 self.pg_temp_dir = tempfile.mkdtemp(prefix='pg_tmp_')
-            self.pg_data_dir = os.path.join(self.pg_temp_dir, 'data')
+                dirname = self.pg_temp_dir
+            self.pg_data_dir = os.path.join(dirname, 'data')
             os.mkdir(self.pg_data_dir)
             if not sock_dir:
-                self.pg_socket_dir = os.path.join(self.pg_temp_dir, 'socket')
+                self.pg_socket_dir = os.path.join(dirname, 'socket')
                 os.mkdir(self.pg_socket_dir)
             else:
                 self.pg_socket_dir = sock_dir
