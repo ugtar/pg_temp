@@ -98,6 +98,7 @@ class TempDB(object):
 
         """
         self.verbosity = verbosity
+        self.pg_process = None
         with check_user() as (run_as, user_name):
             options = dict() if not options else options
             self._setup(databases, retry, tincr, initdb, postgres, sock_dir,
@@ -127,20 +128,8 @@ class TempDB(object):
 
         databases = databases or []
         try:
-            self.pg_process = None
-            self.pg_temp_dir = None
-
-            if not dirname:
-                self.pg_temp_dir = tempfile.mkdtemp(prefix='pg_tmp_')
-                dirname = self.pg_temp_dir
-            self.pg_data_dir = os.path.join(dirname, 'data')
-            os.mkdir(self.pg_data_dir)
-            if not sock_dir:
-                self.pg_socket_dir = os.path.join(dirname, 'socket')
-                os.mkdir(self.pg_socket_dir)
-            else:
-                self.pg_socket_dir = sock_dir
             self.printf("Creating temp PG server...")
+            self._setup_directories(dirname, sock_dir)
             self.create_db_server(run_as, initdb, postgres, options)
             self.test_connection(run_as, psql, retry, tincr)
             self.create_user(run_as, user_name, createuser)
@@ -150,6 +139,19 @@ class TempDB(object):
         except Exception:
             self.cleanup()
             raise
+
+    def _setup_directories(self, dirname, sock_dir):
+        self.pg_temp_dir = None
+        if not dirname:
+            self.pg_temp_dir = tempfile.mkdtemp(prefix='pg_tmp_')
+            dirname = self.pg_temp_dir
+        self.pg_data_dir = os.path.join(dirname, 'data')
+        os.mkdir(self.pg_data_dir)
+        if not sock_dir:
+            self.pg_socket_dir = os.path.join(dirname, 'socket')
+            os.mkdir(self.pg_socket_dir)
+        else:
+            self.pg_socket_dir = sock_dir
 
     def create_db_server(self, run_as, initdb, postgres, options):
         rc = subprocess.call(run_as([initdb, self.pg_data_dir]),
