@@ -148,57 +148,72 @@ class TempDB(object):
             else:
                 self.pg_socket_dir = sock_dir
             self.printf("Creating temp PG server...")
-            rc = subprocess.call(run_as([initdb, self.pg_data_dir]),
-                                 stdout=self.stdout(2),
-                                 stderr=self.stderr(2)) == 0
-            if not rc:
-                raise PGSetupError("Couldn't initialize temp PG data dir")
-            options = ['%s=%s' % (k, v) for (k, v) in options.items()]
-            cmd = [postgres, '-F', '-T', '-D', self.pg_data_dir,
-                   '-k', self.pg_socket_dir, '-h', '']
-            cmd += flatten(zip(itertools.repeat('-c'), options))
-
-            self.printf("Running %s" % str(' '.join(cmd)))
-            self.pg_process = subprocess.Popen(
-                run_as(cmd),
-                stdout=self.stdout(2),
-                stderr=self.stderr(2))
-
-            # test connection
-            for i in range(retry):
-                time.sleep(tincr)
-                rc = subprocess.call(run_as([psql, '-d', 'postgres',
-                                             '-h', self.pg_socket_dir,
-                                             '-c', r"\dt"]),
-                                     stdout=self.stdout(2),
-                                     stderr=self.stderr(2)) == 0
-                if rc:
-                    break
-            else:
-                raise PGSetupError("Couldn't start PG server")
-            rc = subprocess.call(run_as([createuser,
-                                         '-h', self.pg_socket_dir,
-                                         user_name, '-s']),
-                                 stdout=self.stdout(2),
-                                 stderr=self.stderr(2)) == 0
-            if not rc:
-                # maybe the user already exists, and that's ok
-                pass
-            rc = True
-            for db in databases:
-                rc = rc and subprocess.call(
-                    run_as([psql, '-d', 'postgres',
-                            '-h', self.pg_socket_dir,
-                            '-c', "create database %s;" % db]),
-                    stdout=self.stdout(2),
-                    stderr=self.stderr(2)) == 0
-            if not rc:
-                raise PGSetupError("Couldn't create databases")
+            self.create_db_server(run_as, initdb, postgres, options)
+            self.test_connection(run_as, psql, retry, tincr)
+            self.create_user(run_as, user_name, createuser)
+            self.create_databases(run_as, psql, databases)
             self.printf("done")
             self.printf("(Connect on: `psql -h %s`)" % self.pg_socket_dir)
         except Exception:
             self.cleanup()
             raise
+
+    def create_db_server(self, run_as, initdb, postgres, options):
+        rc = subprocess.call(run_as([initdb, self.pg_data_dir]),
+                             stdout=self.stdout(2),
+                             stderr=self.stderr(2)) == 0
+        if not rc:
+            raise PGSetupError("Couldn't initialize temp PG data dir")
+        options = ['%s=%s' % (k, v) for (k, v) in options.items()]
+        cmd = [postgres, '-F', '-T', '-D', self.pg_data_dir,
+               '-k', self.pg_socket_dir, '-h', '']
+        cmd += flatten(zip(itertools.repeat('-c'), options))
+
+        self.printf("Running %s" % str(' '.join(cmd)))
+        self.pg_process = subprocess.Popen(
+            run_as(cmd),
+            stdout=self.stdout(2),
+            stderr=self.stderr(2))
+        return rc
+
+    def test_connection(self, run_as, psql, retry, tincr):
+        # test connection
+        for i in range(retry):
+            time.sleep(tincr)
+            rc = subprocess.call(run_as([psql, '-d', 'postgres',
+                                         '-h', self.pg_socket_dir,
+                                         '-c', r"\dt"]),
+                                 stdout=self.stdout(2),
+                                 stderr=self.stderr(2)) == 0
+            if rc:
+                break
+        else:
+            raise PGSetupError("Couldn't start PG server")
+        return rc
+
+    def create_user(self, run_as, user_name, createuser):
+        rc = subprocess.call(run_as([createuser,
+                                     '-h', self.pg_socket_dir,
+                                     user_name, '-s']),
+                             stdout=self.stdout(2),
+                             stderr=self.stderr(2)) == 0
+        if not rc:
+            # maybe the user already exists, and that's ok
+            pass
+        return rc
+
+    def create_databases(self, run_as, psql, databases):
+        rc = True
+        for db in databases:
+            rc = rc and subprocess.call(
+                run_as([psql, '-d', 'postgres',
+                        '-h', self.pg_socket_dir,
+                        '-c', "create database %s;" % db]),
+                stdout=self.stdout(2),
+                stderr=self.stderr(2)) == 0
+        if not rc:
+            raise PGSetupError("Couldn't create databases")
+        return rc
 
     def cleanup(self):
         if self.pg_process:
