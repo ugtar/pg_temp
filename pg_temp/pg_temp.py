@@ -1,5 +1,4 @@
 """Set up a temporary postgres DB"""
-from __future__ import absolute_import, division, unicode_literals
 import itertools
 import os
 import sys
@@ -10,11 +9,7 @@ import tempfile
 import time
 import pwd
 from contextlib import contextmanager
-
-if sys.version_info < (3, 3):
-    from pipes import quote
-else:
-    from shlex import quote
+from shlex import quote
 
 
 # Module level TempDB singleton
