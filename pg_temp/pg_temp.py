@@ -45,6 +45,7 @@ class TempDB(object):
                  verbosity=1,
                  retry=5,
                  tincr=1.0,
+                 docker_img=None,
                  initdb='initdb',
                  postgres='postgres',
                  psql='psql',
@@ -58,6 +59,7 @@ class TempDB(object):
         :param verbosity: verbosity level, larger values are more verbose
         :param retry: number of times to retry a connection
         :param tincr: how much time to wait between retries
+        :param docker_img: specify a docker image for postres
         :param initdb: path to `initdb`, defaults to first in $PATH
         :param postgres: path to `postgres`, defaults to first in $PATH
         :param psql: path to `psql`, defaults to first in $PATH
@@ -69,6 +71,11 @@ class TempDB(object):
 
         """
         self.verbosity = verbosity
+        self.docker_prefix = None
+        self.docker_container = None
+        self.docker_img = docker_img
+        if self.docker_img:
+            self._setup_docker_prefix()
         self.pg_process = None
         # we won't expose this yet
         self.run_as = self._get_run_as_account(None)
@@ -76,6 +83,13 @@ class TempDB(object):
         options = dict() if not options else options
         self._setup(databases, retry, tincr, initdb, postgres, sock_dir,
                     psql, createuser, dirname, options)
+
+    def _setup_docker_prefix(self, *args, mode='init'):
+        if mode == 'init':
+            self.docker_prefix = ['docker', 'run', '--rm', '-e',
+                                  'POSTGRES_HOST_AUTH_METHOD=trust']
+        elif mode == 'exec':
+            self.docker_prefix = ['docker', 'exec', *args]
 
     def _get_run_as_account(self, run_as):
         if run_as:
@@ -141,7 +155,11 @@ class TempDB(object):
         print(msg)
 
     def run_cmd(self, cmd, level=0, bg=False):
-        cmd = self._user_subshell(cmd)
+        if self.docker_prefix:
+            cmd = self.docker_prefix + cmd
+        else:
+            cmd = self._user_subshell(cmd)
+        self.printf("Running %s" % str(' '.join(cmd)))
         p = subprocess.Popen(cmd, stdout=self.stdout(level),
                              stderr=self.stderr(level))
         if bg:
@@ -158,9 +176,14 @@ class TempDB(object):
             with self._do_run_as():
                 self._setup_directories(dirname, sock_dir)
             self.create_db_server(initdb, postgres, options)
+            if self.docker_img:
+                self._real_pg_socket_dir = self.pg_socket_dir
+                self.pg_socket_dir = '/var/run/postgresql'
             self.test_connection(psql, retry, tincr)
             self.create_user(createuser)
             self.create_databases(psql, databases)
+            if self.docker_img:
+                self.pg_socket_dir = self._real_pg_socket_dir
             self.printf("done")
             self.printf("(Connect on: `psql -h %s`)" % self.pg_socket_dir)
         except Exception:
@@ -181,25 +204,39 @@ class TempDB(object):
             self.pg_socket_dir = sock_dir
 
     def create_db_server(self, initdb, postgres, options):
-        rc = self.run_cmd([initdb, self.pg_data_dir], level=2)
-        if not rc:
-            raise PGSetupError("Couldn't initialize temp PG data dir")
+        if not self.docker_prefix:
+            rc = self.run_cmd([initdb, self.pg_data_dir], level=2)
+            if not rc:
+                raise PGSetupError("Couldn't initialize temp PG data dir")
         options = ['%s=%s' % (k, v) for (k, v) in options.items()]
-        cmd = [postgres, '-F', '-T', '-D', self.pg_data_dir,
-               '-k', self.pg_socket_dir, '-h', '']
+        if self.docker_prefix:
+            _, cidfile = tempfile.mkstemp()
+            os.unlink(cidfile)
+            cmd = ['-d', '--cidfile', cidfile, '-v',
+                   self.pg_socket_dir + ':/var/run/postgresql', self.docker_img,
+                   postgres, '-F', '-T', '-h', '']
+            bg = False
+        else:
+            cmd = [postgres, '-F', '-T', '-D', self.pg_data_dir,
+                   '-k', self.pg_socket_dir, '-h', '']
+            bg = True
         cmd += flatten(zip(itertools.repeat('-c'), options))
 
-        self.printf("Running %s" % str(' '.join(cmd)))
-        self.pg_process = self.run_cmd(cmd, level=2, bg=True)
-        return rc
+        self.pg_process = self.run_cmd(cmd, level=2, bg=bg)
+        if self.docker_prefix:
+            with open(cidfile) as f:
+                self.docker_container = f.read()
+                self._setup_docker_prefix(self.docker_container, mode='exec')
+            os.unlink(cidfile)
 
     def test_connection(self, psql, retry, tincr):
         # test connection
+        cmd = [psql, '-d', 'postgres', '-h', self.pg_socket_dir, '-c', r"\dt"]
+        if self.docker_img:
+            cmd += ['-U', 'postgres']
         for i in range(retry):
             time.sleep(tincr)
-            rc = self.run_cmd([psql, '-d', 'postgres',
-                               '-h', self.pg_socket_dir,
-                               '-c', r"\dt"], level=2)
+            rc = self.run_cmd(cmd, level=2)
             if rc:
                 break
         else:
@@ -207,9 +244,10 @@ class TempDB(object):
         return rc
 
     def create_user(self, createuser):
-        rc = self.run_cmd([createuser, '-h', self.pg_socket_dir,
-                           self.current_user, '-s'],
-                          level=2)
+        cmd = [createuser, '-h', self.pg_socket_dir, self.current_user, '-s']
+        if self.docker_img:
+            cmd += ['-U', 'postgres']
+        rc = self.run_cmd(cmd, level=2)
         if not rc:
             # maybe the user already exists, and that's ok
             pass
@@ -218,16 +256,20 @@ class TempDB(object):
     def create_databases(self, psql, databases):
         rc = True
         for db in databases:
-            rc = rc and self.run_cmd([psql, '-d', 'postgres',
-                                      '-h', self.pg_socket_dir,
-                                      '-c', "create database %s;" % db],
-                                     level=2)
+            cmd = [psql, '-d', 'postgres', '-h', self.pg_socket_dir,
+                   '-c', "create database %s;" % db]
+            if self.docker_img:
+                cmd += ['-U', 'postgres']
+            rc = rc and self.run_cmd(cmd, level=2)
         if not rc:
             raise PGSetupError("Couldn't create databases")
         return rc
 
     def cleanup(self):
-        if self.pg_process:
+        if self.docker_container:
+            subprocess.run(['docker', 'kill', self.docker_container],
+                           stdout=subprocess.DEVNULL)
+        elif self.pg_process:
             self.pg_process.kill()
             self.pg_process.wait()
         for d in [self.pg_temp_dir]:
