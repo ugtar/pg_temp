@@ -10,6 +10,7 @@ import time
 import pwd
 from contextlib import contextmanager
 import shlex
+import warnings
 
 
 # Module level TempDB singleton
@@ -19,6 +20,7 @@ temp_db = None
 # Module constants
 DEFAULT_DOCKER_EXE = 'docker'
 DOCKER_INTERNAL_SOCK_DIR = '/var/run/postgresql'
+FALLBACK_DOCKER_IMG = 'postgres'
 
 DEFAULT_POSTGRES = 'postgres'
 DEFAULT_INITDB = 'initdb'
@@ -85,6 +87,8 @@ class TempDB(object):
         self.docker_prefix = None
         self.docker_container = None
         self.docker_img = docker_img
+        # check for a postgres install, or fallback to docker
+        self._get_docker_fallback(postgres)
         self.pg_process = None
         # we won't expose this yet
         self.run_as = self._get_run_as_account(None)
@@ -92,6 +96,21 @@ class TempDB(object):
         options = dict() if not options else options
         self._setup(databases, retry, tincr, initdb, postgres, sock_dir,
                     psql, createuser, dirname, options)
+
+    def _get_docker_fallback(self, postgres_exe):
+        if self.docker_img:
+            # already using docker
+            return
+        if postgres_exe != DEFAULT_POSTGRES:
+            # exe was specified explicitly so don't use a fallback
+            return
+        if not shutil.which(DEFAULT_POSTGRES):
+            has_docker = shutil.which(DEFAULT_DOCKER_EXE)
+            if not has_docker:
+                raise PGSetupError("Unable to locate a postgres installation")
+            warnings.warn("Unable to locate a postgres install. "
+                          "Attempting fallback to docker...")
+            self.docker_img = FALLBACK_DOCKER_IMG
 
     def _setup_docker_prefix(self, *args, mode='init'):
         if mode == 'init':
