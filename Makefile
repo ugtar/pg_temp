@@ -3,7 +3,6 @@
 # External commands
 CTAGS ?= ctags
 FIND ?= find
-PYTEST ?= py.test
 PYTHON ?= python3
 RM ?= rm -f
 RM_R ?= rm -fr

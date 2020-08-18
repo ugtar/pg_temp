@@ -1,6 +1,7 @@
 import unittest
 import tempfile
 import shutil
+import os
 
 import psycopg2
 
@@ -41,7 +42,8 @@ class SpecifySocketTestCase(unittest.TestCase):
 
     def setUp(self):
         self.socket_dir = tempfile.mkdtemp()
-        self.db = TempDB(databases=['test_db'], verbosity=1,
+        os.chmod(self.socket_dir, 0o777)
+        self.db = TempDB(databases=['test_db'], verbosity=2,
                          sock_dir=self.socket_dir)
 
     def tearDown(self):
