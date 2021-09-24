@@ -127,7 +127,7 @@ class TempDB(object):
                 return pwd.getpwnam(run_as)
             except KeyError:
                 raise PGSetupError("Can't locate user {}!".format(run_as,))
-        current_ruid, current_euid, current_suid = os.getresuid()
+        current_euid = os.geteuid()
         if current_euid == 0:
             # If running as root, try to run the db server creation as postgres
             # user (assumed to exist)
