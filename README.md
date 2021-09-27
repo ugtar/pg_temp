@@ -1,7 +1,7 @@
 pg_temp
 ==========
 
-[![pg_temp build status](https://api.travis-ci.org/ugtar/pg_temp.svg?branch=master)](https://travis-ci.org/ugtar/pg_temp)
+[![pg_temp build status](https://github.com/ugtar/pg_temp/actions/workflows/python-app.yml/badge.svg?branch=master)](https://github.com/ugtar/pg_temp/actions/workflows/python-app.yml)
 
 Provides a simple class for creating a temporary userland Postgres db server.
 
