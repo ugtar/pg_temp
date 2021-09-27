@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import os
+
 try:
     import setuptools as setup_mod
 except ImportError:

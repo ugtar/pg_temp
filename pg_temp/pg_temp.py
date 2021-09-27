@@ -51,20 +51,21 @@ class PGSetupError(Exception):
 
 
 class TempDB(object):
-
-    def __init__(self,
-                 databases=None,
-                 verbosity=1,
-                 retry=5,
-                 tincr=1.0,
-                 docker_img=None,
-                 initdb=DEFAULT_INITDB,
-                 postgres=DEFAULT_POSTGRES,
-                 psql=DEFAULT_PSQL,
-                 createuser=DEFAULT_CREATEUSER,
-                 dirname=None,
-                 sock_dir=None,
-                 options=None):
+    def __init__(
+        self,
+        databases=None,
+        verbosity=1,
+        retry=5,
+        tincr=1.0,
+        docker_img=None,
+        initdb=DEFAULT_INITDB,
+        postgres=DEFAULT_POSTGRES,
+        psql=DEFAULT_PSQL,
+        createuser=DEFAULT_CREATEUSER,
+        dirname=None,
+        sock_dir=None,
+        options=None,
+    ):
         """Initialize a temporary Postgres database
 
         :param databases: list of databases to create
@@ -94,8 +95,18 @@ class TempDB(object):
         self.run_as = self._get_run_as_account(None)
         self.current_user = pwd.getpwuid(os.geteuid()).pw_name
         options = dict() if not options else options
-        self._setup(databases, retry, tincr, initdb, postgres, sock_dir,
-                    psql, createuser, dirname, options)
+        self._setup(
+            databases,
+            retry,
+            tincr,
+            initdb,
+            postgres,
+            sock_dir,
+            psql,
+            createuser,
+            dirname,
+            options,
+        )
 
     def _get_docker_fallback(self, postgres_exe):
         if self.docker_img:
@@ -108,25 +119,35 @@ class TempDB(object):
             has_docker = shutil.which(DEFAULT_DOCKER_EXE)
             if not has_docker:
                 raise PGSetupError("Unable to locate a postgres installation")
-            warnings.warn("Unable to locate a postgres install. "
-                          "Attempting fallback to docker...")
+            warnings.warn(
+                "Unable to locate a postgres install. "
+                "Attempting fallback to docker..."
+            )
             self.docker_img = FALLBACK_DOCKER_IMG
 
     def _setup_docker_prefix(self, *args, mode='init'):
         if mode == 'init':
-            self.docker_prefix = [DEFAULT_DOCKER_EXE, 'run', '--rm', '-e',
-                                  'POSTGRES_HOST_AUTH_METHOD=trust',
-                                  '--user=postgres']
+            self.docker_prefix = [
+                DEFAULT_DOCKER_EXE,
+                'run',
+                '--rm',
+                '-e',
+                'POSTGRES_HOST_AUTH_METHOD=trust',
+                '--user=postgres',
+            ]
         elif mode == 'exec':
-            self.docker_prefix = [DEFAULT_DOCKER_EXE,
-                                  'exec', '--user=postgres', *args]
+            self.docker_prefix = [DEFAULT_DOCKER_EXE, 'exec', '--user=postgres', *args]
 
     def _get_run_as_account(self, run_as):
         if run_as:
             try:
                 return pwd.getpwnam(run_as)
             except KeyError:
-                raise PGSetupError("Can't locate user {}!".format(run_as,))
+                raise PGSetupError(
+                    "Can't locate user {}!".format(
+                        run_as,
+                    )
+                )
         current_euid = os.geteuid()
         if current_euid == 0:
             # If running as root, try to run the db server creation as postgres
@@ -134,8 +155,9 @@ class TempDB(object):
             try:
                 return pwd.getpwnam('postgres')
             except KeyError:
-                raise PGSetupError("Can't create DB server as root, and "
-                                   "there's no postgres user!")
+                raise PGSetupError(
+                    "Can't create DB server as root, and " "there's no postgres user!"
+                )
         return None
 
     @contextmanager
@@ -162,8 +184,7 @@ class TempDB(object):
         # euid set -- hence, `su`.
         if not self.run_as:
             return cmd
-        return ['su', '-', 'postgres', '-c',
-                ' '.join(shlex.quote(c) for c in cmd)]
+        return ['su', '-', 'postgres', '-c', ' '.join(shlex.quote(c) for c in cmd)]
 
     def stdout(self, level):
         """Return file handle for stdout for the current verbosity"""
@@ -190,15 +211,25 @@ class TempDB(object):
         else:
             cmd = self._user_subshell(cmd)
         self.printf("Running %s" % str(' '.join(cmd)))
-        p = subprocess.Popen(cmd, stdout=self.stdout(level),
-                             stderr=self.stderr(level))
+        p = subprocess.Popen(cmd, stdout=self.stdout(level), stderr=self.stderr(level))
         if bg:
             return p
         p.communicate()
         return p.returncode == 0
 
-    def _setup(self, databases, retry, tincr, initdb, postgres, sock_dir,
-               psql, createuser, dirname, options):
+    def _setup(
+        self,
+        databases,
+        retry,
+        tincr,
+        initdb,
+        postgres,
+        sock_dir,
+        psql,
+        createuser,
+        dirname,
+        options,
+    ):
 
         databases = databases or []
         try:
@@ -248,14 +279,32 @@ class TempDB(object):
         if self.docker_prefix:
             _, cidfile = tempfile.mkstemp()
             os.unlink(cidfile)
-            cmd = ['-d', '--cidfile', cidfile,
-                   '-v', self.pg_socket_dir + ':' + DOCKER_INTERNAL_SOCK_DIR,
-                   self.docker_img,
-                   postgres, '-F', '-T', '-h', '']
+            cmd = [
+                '-d',
+                '--cidfile',
+                cidfile,
+                '-v',
+                self.pg_socket_dir + ':' + DOCKER_INTERNAL_SOCK_DIR,
+                self.docker_img,
+                postgres,
+                '-F',
+                '-T',
+                '-h',
+                '',
+            ]
             bg = False
         else:
-            cmd = [postgres, '-F', '-T', '-D', self.pg_data_dir,
-                   '-k', self.pg_socket_dir, '-h', '']
+            cmd = [
+                postgres,
+                '-F',
+                '-T',
+                '-D',
+                self.pg_data_dir,
+                '-k',
+                self.pg_socket_dir,
+                '-h',
+                '',
+            ]
             bg = True
         cmd += flatten(zip(itertools.repeat('-c'), options))
 
@@ -288,8 +337,15 @@ class TempDB(object):
     def create_databases(self, psql, databases):
         rc = True
         for db in databases:
-            cmd = [psql, '-d', 'postgres', '-h', self.pg_socket_dir,
-                   '-c', "create database %s;" % db]
+            cmd = [
+                psql,
+                '-d',
+                'postgres',
+                '-h',
+                self.pg_socket_dir,
+                '-c',
+                "create database %s;" % db,
+            ]
             rc = rc and self.run_cmd(cmd, level=2)
         if not rc:
             raise PGSetupError("Couldn't create databases")
@@ -297,8 +353,10 @@ class TempDB(object):
 
     def cleanup(self):
         if self.docker_container:
-            subprocess.run([DEFAULT_DOCKER_EXE, 'kill', self.docker_container],
-                           stdout=subprocess.DEVNULL)
+            subprocess.run(
+                [DEFAULT_DOCKER_EXE, 'kill', self.docker_container],
+                stdout=subprocess.DEVNULL,
+            )
         elif self.pg_process:
             self.pg_process.kill()
             self.pg_process.wait()
