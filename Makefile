@@ -8,6 +8,7 @@ RM ?= rm -f
 RM_R ?= rm -fr
 SH ?= sh
 TOX ?= tox
+BLACK ?= black
 
 # Options
 flags ?=
@@ -54,6 +55,7 @@ help:
 
 check:
 	$(TOXCMD) -v -e flake8 $(flags)
+	$(BLACK) --check .
 .PHONY: check
 
 clean:

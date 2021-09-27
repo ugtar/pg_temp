@@ -95,6 +95,13 @@ Virtualenv directly, run the unit tests using tox:
 
     make tox
 
-Check code style using flake8:
+Check code style using flake8 and black:
 
     make check
+
+Code is auto-formatted using `black`. Since this was done relatively
+recently, you should configure git to ignore the reformatting commit
+using the --ignore-rev or the --ignore-revs-file option to git blame,
+or configure this by:
+`git config blame.ignoreRevsFile .git-blame-ignore-revs`
+The ignore revisions file is called `.git-blame-ignore-revs`

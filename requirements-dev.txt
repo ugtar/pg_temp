@@ -3,3 +3,4 @@ psycopg2-binary
 pytest
 unittest2
 tox
+black
